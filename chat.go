@@ -390,6 +390,9 @@ type ChatCompletionResponse struct {
 	Usage               Usage                  `json:"usage"`
 	SystemFingerprint   string                 `json:"system_fingerprint"`
 	PromptFilterResults []PromptFilterResult   `json:"prompt_filter_results,omitempty"`
+	// Citations is a list of URLs or references that the model used in generating its response.
+	// This is primarily used by Perplexity AI models.
+	Citations           []string               `json:"citations,omitempty"`
 
 	httpHeader
 }
