@@ -87,9 +87,10 @@ const (
 )
 
 type ChatMessagePart struct {
-	Type     ChatMessagePartType  `json:"type,omitempty"`
-	Text     string               `json:"text,omitempty"`
-	ImageURL *ChatMessageImageURL `json:"image_url,omitempty"`
+	Type         ChatMessagePartType  `json:"type,omitempty"`
+	Text         string               `json:"text,omitempty"`
+	ImageURL     *ChatMessageImageURL `json:"image_url,omitempty"`
+	CacheControl *CacheControl        `json:"cache_control,omitempty"`
 }
 
 type CacheControlType string
@@ -121,9 +122,6 @@ type ChatCompletionMessage struct {
 
 	// For Role=tool prompts this should be set to the ID given in the assistant's prior request to call a tool.
 	ToolCallID string `json:"tool_call_id,omitempty"`
-
-	// CacheControl is used to control the caching behavior of the message. Used by Litellm.
-	CacheControl *CacheControl `json:"cache_control,omitempty"`
 }
 
 func (m ChatCompletionMessage) MarshalJSON() ([]byte, error) {
@@ -140,7 +138,6 @@ func (m ChatCompletionMessage) MarshalJSON() ([]byte, error) {
 			FunctionCall *FunctionCall     `json:"function_call,omitempty"`
 			ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`
 			ToolCallID   string            `json:"tool_call_id,omitempty"`
-			CacheControl *CacheControl     `json:"cache_control,omitempty"`
 		}(m)
 		return json.Marshal(msg)
 	}
@@ -154,7 +151,6 @@ func (m ChatCompletionMessage) MarshalJSON() ([]byte, error) {
 		FunctionCall *FunctionCall     `json:"function_call,omitempty"`
 		ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`
 		ToolCallID   string            `json:"tool_call_id,omitempty"`
-		CacheControl *CacheControl     `json:"cache_control,omitempty"`
 	}(m)
 	return json.Marshal(msg)
 }
@@ -169,7 +165,6 @@ func (m *ChatCompletionMessage) UnmarshalJSON(bs []byte) error {
 		FunctionCall *FunctionCall `json:"function_call,omitempty"`
 		ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
 		ToolCallID   string        `json:"tool_call_id,omitempty"`
-		CacheControl *CacheControl `json:"cache_control,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(bs, &msg); err == nil {
@@ -185,7 +180,6 @@ func (m *ChatCompletionMessage) UnmarshalJSON(bs []byte) error {
 		FunctionCall *FunctionCall     `json:"function_call,omitempty"`
 		ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`
 		ToolCallID   string            `json:"tool_call_id,omitempty"`
-		CacheControl *CacheControl     `json:"cache_control,omitempty"`
 	}{}
 	if err := json.Unmarshal(bs, &multiMsg); err != nil {
 		return err
@@ -392,7 +386,7 @@ type ChatCompletionResponse struct {
 	PromptFilterResults []PromptFilterResult   `json:"prompt_filter_results,omitempty"`
 	// Citations is a list of URLs or references that the model used in generating its response.
 	// This is primarily used by Perplexity AI models.
-	Citations           []string               `json:"citations,omitempty"`
+	Citations []string `json:"citations,omitempty"`
 
 	httpHeader
 }
