@@ -291,6 +291,8 @@ type ChatCompletionRequest struct {
 	// Such as think mode for qwen3. "chat_template_kwargs": {"enable_thinking": false}
 	// https://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes
 	ChatTemplateKwargs map[string]any `json:"chat_template_kwargs,omitempty"`
+	// ExtraHeaders allows passing custom HTTP headers
+	ExtraHeaders http.Header `json:"-"`
 }
 
 type StreamOptions struct {
@@ -304,12 +306,47 @@ type StreamOptions struct {
 type ToolType string
 
 const (
-	ToolTypeFunction ToolType = "function"
+	ToolTypeFunction            ToolType = "function"
+	ToolTypeTextEditor20241022  ToolType = "text_editor_20241022"
+	ToolTypeTextEditor20250124  ToolType = "text_editor_20250124"
+	ToolTypeTextEditor20250728  ToolType = "text_editor_20250728"
+	ToolTypeMemory20250818      ToolType = "memory_20250818"
 )
 
 type Tool struct {
 	Type     ToolType            `json:"type"`
 	Function *FunctionDefinition `json:"function,omitempty"`
+	Name     string              `json:"name,omitempty"` // For Anthropic-defined tools like text_editor_20250124
+}
+
+// MarshalJSON customizes JSON marshaling for Tool to properly handle Anthropic-defined tools
+func (t Tool) MarshalJSON() ([]byte, error) {
+	// For Anthropic-defined tools (non-function tools), include type and name
+	if t.Type != ToolTypeFunction {
+		// Determine the appropriate name based on tool type
+		// Per Bedrock documentation: https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic.html
+		name := ""
+		switch t.Type {
+		case ToolTypeTextEditor20241022, ToolTypeTextEditor20250124:
+			name = "str_replace_editor"
+		case ToolTypeTextEditor20250728:
+			name = "str_replace_based_edit_tool"
+		case ToolTypeMemory20250818:
+			name = "memory"
+		}
+
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			Name string   `json:"name"`
+		}{
+			Type: t.Type,
+			Name: name,
+		})
+	}
+
+	// For function tools, include all fields
+	type Alias Tool
+	return json.Marshal((Alias)(t))
 }
 
 type ToolChoice struct {
@@ -434,11 +471,19 @@ func (c *Client) CreateChatCompletion(
 		return
 	}
 
+	// Build request options
+	requestOptions := []requestOption{withBody(request)}
+
+	// Add extra headers if provided
+	if request.ExtraHeaders != nil && len(request.ExtraHeaders) > 0 {
+		requestOptions = append(requestOptions, withHeaders(request.ExtraHeaders))
+	}
+
 	req, err := c.newRequest(
 		ctx,
 		http.MethodPost,
 		c.fullURL(urlSuffix, withModel(request.Model)),
-		withBody(request),
+		requestOptions...,
 	)
 	if err != nil {
 		return
