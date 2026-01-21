@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 )
 
@@ -84,13 +85,29 @@ type ChatMessagePartType string
 const (
 	ChatMessagePartTypeText     ChatMessagePartType = "text"
 	ChatMessagePartTypeImageURL ChatMessagePartType = "image_url"
+	ChatMessagePartTypeDocument ChatMessagePartType = "document"
 )
 
+// DocumentSource represents the source of a document for Anthropic citations
+type DocumentSource struct {
+	Type      string `json:"type"`       // "text" or "pdf"
+	MediaType string `json:"media_type"` // MIME type like "text/plain"
+	Data      string `json:"data"`       // Document content
+}
+
+// DocumentCitations controls citation behavior for Anthropic
+type DocumentCitations struct {
+	Enabled bool `json:"enabled"`
+}
+
 type ChatMessagePart struct {
-	Type         ChatMessagePartType  `json:"type,omitempty"`
-	Text         string               `json:"text,omitempty"`
-	ImageURL     *ChatMessageImageURL `json:"image_url,omitempty"`
-	CacheControl *CacheControl        `json:"cache_control,omitempty"`
+	Type         ChatMessagePartType    `json:"type,omitempty"`
+	Text         string                 `json:"text,omitempty"`
+	ImageURL     *ChatMessageImageURL   `json:"image_url,omitempty"`
+	CacheControl *CacheControl          `json:"cache_control,omitempty"`
+	Source       *DocumentSource        `json:"source,omitempty"`       // For document type
+	Title        string                 `json:"title,omitempty"`        // For document type
+	Citations    *DocumentCitations     `json:"citations,omitempty"`    // For document type
 }
 
 type CacheControlType string
@@ -128,6 +145,47 @@ type ChatCompletionMessage struct {
 
 	// For Role=tool prompts this should be set to the ID given in the assistant's prior request to call a tool.
 	ToolCallID string `json:"tool_call_id,omitempty"`
+
+	// ProviderSpecificFields contains provider-specific response data (e.g., citations from Anthropic via LiteLLM)
+	// Example: response.choices[0].message.provider_specific_fields["citations"]
+	ProviderSpecificFields map[string]any `json:"provider_specific_fields,omitempty"`
+}
+
+// AnthropicCitation represents a citation returned by Anthropic's citation API
+type AnthropicCitation struct {
+	Type          string `json:"type"`            // e.g., "char_location"
+	CitedText     string `json:"cited_text"`      // The exact text being cited
+	DocumentIndex int    `json:"document_index"`  // Index of the document (0-based)
+	DocumentTitle string `json:"document_title"`  // Title of the cited document
+	StartChar     int    `json:"start_char_index,omitempty"` // For char_location type
+	EndChar       int    `json:"end_char_index,omitempty"`   // For char_location type
+}
+
+// GetAnthropicCitations extracts Anthropic citations from provider_specific_fields
+// Returns error if citations field is not present or not in expected Anthropic format
+func (m *ChatCompletionMessage) GetAnthropicCitations() ([][]AnthropicCitation, error) {
+	if m.ProviderSpecificFields == nil {
+		return nil, fmt.Errorf("no provider_specific_fields present")
+	}
+
+	citations, ok := m.ProviderSpecificFields["citations"]
+	if !ok {
+		return nil, fmt.Errorf("no citations field in provider_specific_fields")
+	}
+
+	// Marshal back to JSON and unmarshal into typed struct
+	// This handles the nested array structure: [[[citation, citation], [citation]], ...]
+	b, err := json.Marshal(citations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal citations: %w", err)
+	}
+
+	var result [][]AnthropicCitation
+	if err := json.Unmarshal(b, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal citations as Anthropic format: %w", err)
+	}
+
+	return result, nil
 }
 
 func (m ChatCompletionMessage) MarshalJSON() ([]byte, error) {
@@ -136,44 +194,47 @@ func (m ChatCompletionMessage) MarshalJSON() ([]byte, error) {
 	}
 	if len(m.MultiContent) > 0 {
 		msg := struct {
-			Role             string            `json:"role"`
-			Content          string            `json:"-"`
-			Refusal          string            `json:"refusal,omitempty"`
-			MultiContent     []ChatMessagePart `json:"content,omitempty"`
-			Name             string            `json:"name,omitempty"`
-			ReasoningContent string            `json:"reasoning_content,omitempty"`
-			FunctionCall     *FunctionCall     `json:"function_call,omitempty"`
-			ToolCalls        []ToolCall        `json:"tool_calls,omitempty"`
-			ToolCallID       string            `json:"tool_call_id,omitempty"`
+			Role                   string            `json:"role"`
+			Content                string            `json:"-"`
+			Refusal                string            `json:"refusal,omitempty"`
+			MultiContent           []ChatMessagePart `json:"content,omitempty"`
+			Name                   string            `json:"name,omitempty"`
+			ReasoningContent       string            `json:"reasoning_content,omitempty"`
+			FunctionCall           *FunctionCall     `json:"function_call,omitempty"`
+			ToolCalls              []ToolCall        `json:"tool_calls,omitempty"`
+			ToolCallID             string            `json:"tool_call_id,omitempty"`
+			ProviderSpecificFields map[string]any    `json:"provider_specific_fields,omitempty"`
 		}(m)
 		return json.Marshal(msg)
 	}
 
 	msg := struct {
-		Role             string            `json:"role"`
-		Content          string            `json:"content,omitempty"`
-		Refusal          string            `json:"refusal,omitempty"`
-		MultiContent     []ChatMessagePart `json:"-"`
-		Name             string            `json:"name,omitempty"`
-		ReasoningContent string            `json:"reasoning_content,omitempty"`
-		FunctionCall     *FunctionCall     `json:"function_call,omitempty"`
-		ToolCalls        []ToolCall        `json:"tool_calls,omitempty"`
-		ToolCallID       string            `json:"tool_call_id,omitempty"`
+		Role                   string            `json:"role"`
+		Content                string            `json:"content,omitempty"`
+		Refusal                string            `json:"refusal,omitempty"`
+		MultiContent           []ChatMessagePart `json:"-"`
+		Name                   string            `json:"name,omitempty"`
+		ReasoningContent       string            `json:"reasoning_content,omitempty"`
+		FunctionCall           *FunctionCall     `json:"function_call,omitempty"`
+		ToolCalls              []ToolCall        `json:"tool_calls,omitempty"`
+		ToolCallID             string            `json:"tool_call_id,omitempty"`
+		ProviderSpecificFields map[string]any    `json:"provider_specific_fields,omitempty"`
 	}(m)
 	return json.Marshal(msg)
 }
 
 func (m *ChatCompletionMessage) UnmarshalJSON(bs []byte) error {
 	msg := struct {
-		Role             string `json:"role"`
-		Content          string `json:"content"`
-		Refusal          string `json:"refusal,omitempty"`
-		MultiContent     []ChatMessagePart
-		Name             string        `json:"name,omitempty"`
-		ReasoningContent string        `json:"reasoning_content,omitempty"`
-		FunctionCall     *FunctionCall `json:"function_call,omitempty"`
-		ToolCalls        []ToolCall    `json:"tool_calls,omitempty"`
-		ToolCallID       string        `json:"tool_call_id,omitempty"`
+		Role                   string `json:"role"`
+		Content                string `json:"content"`
+		Refusal                string `json:"refusal,omitempty"`
+		MultiContent           []ChatMessagePart
+		Name                   string            `json:"name,omitempty"`
+		ReasoningContent       string            `json:"reasoning_content,omitempty"`
+		FunctionCall           *FunctionCall     `json:"function_call,omitempty"`
+		ToolCalls              []ToolCall        `json:"tool_calls,omitempty"`
+		ToolCallID             string            `json:"tool_call_id,omitempty"`
+		ProviderSpecificFields map[string]any    `json:"provider_specific_fields,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(bs, &msg); err == nil {
@@ -181,15 +242,16 @@ func (m *ChatCompletionMessage) UnmarshalJSON(bs []byte) error {
 		return nil
 	}
 	multiMsg := struct {
-		Role             string `json:"role"`
-		Content          string
-		Refusal          string            `json:"refusal,omitempty"`
-		MultiContent     []ChatMessagePart `json:"content"`
-		Name             string            `json:"name,omitempty"`
-		ReasoningContent string            `json:"reasoning_content,omitempty"`
-		FunctionCall     *FunctionCall     `json:"function_call,omitempty"`
-		ToolCalls        []ToolCall        `json:"tool_calls,omitempty"`
-		ToolCallID       string            `json:"tool_call_id,omitempty"`
+		Role                   string `json:"role"`
+		Content                string
+		Refusal                string            `json:"refusal,omitempty"`
+		MultiContent           []ChatMessagePart `json:"content"`
+		Name                   string            `json:"name,omitempty"`
+		ReasoningContent       string            `json:"reasoning_content,omitempty"`
+		FunctionCall           *FunctionCall     `json:"function_call,omitempty"`
+		ToolCalls              []ToolCall        `json:"tool_calls,omitempty"`
+		ToolCallID             string            `json:"tool_call_id,omitempty"`
+		ProviderSpecificFields map[string]any    `json:"provider_specific_fields,omitempty"`
 	}{}
 	if err := json.Unmarshal(bs, &multiMsg); err != nil {
 		return err
