@@ -152,13 +152,28 @@ type ChatCompletionMessage struct {
 }
 
 // AnthropicCitation represents a citation returned by Anthropic's citation API
+// When accessed via LiteLLM, includes additional transformation fields like SupportedText
 type AnthropicCitation struct {
-	Type          string `json:"type"`            // e.g., "char_location"
-	CitedText     string `json:"cited_text"`      // The exact text being cited
+	Type          string `json:"type"`            // e.g., "char_location", "page_location", "content_block_location"
+	CitedText     string `json:"cited_text"`      // The exact text being cited from source
 	DocumentIndex int    `json:"document_index"`  // Index of the document (0-based)
 	DocumentTitle string `json:"document_title"`  // Title of the cited document
-	StartChar     int    `json:"start_char_index,omitempty"` // For char_location type
-	EndChar       int    `json:"end_char_index,omitempty"`   // For char_location type
+	FileID        string `json:"file_id,omitempty"` // Optional file identifier
+
+	// For char_location type (plain text documents)
+	StartChar int `json:"start_char_index,omitempty"` // Character index where citation starts (0-indexed)
+	EndChar   int `json:"end_char_index,omitempty"`   // Character index where citation ends (exclusive)
+
+	// For page_location type (PDF documents)
+	StartPage int `json:"start_page_number,omitempty"` // Page number where citation starts (1-indexed)
+	EndPage   int `json:"end_page_number,omitempty"`   // Page number where citation ends (exclusive)
+
+	// For content_block_location type (custom content documents)
+	StartBlock int `json:"start_block_index,omitempty"` // Block index where citation starts (0-indexed)
+	EndBlock   int `json:"end_block_index,omitempty"`   // Block index where citation ends (exclusive)
+
+	// LiteLLM transformation field - the response text that this citation supports
+	SupportedText string `json:"supported_text,omitempty"`
 }
 
 // GetAnthropicCitations extracts Anthropic citations from provider_specific_fields
