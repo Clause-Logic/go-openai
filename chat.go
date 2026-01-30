@@ -90,10 +90,9 @@ const (
 
 // DocumentSource represents the source of a document for Anthropic citations
 type DocumentSource struct {
-	Type      string `json:"type"`                // "text" or "pdf"
-	MediaType string `json:"media_type"`          // MIME type like "text/plain"
-	Data      string `json:"data"`                // Document content
-	Context   string `json:"context,omitempty"`   // Additional context about the document (e.g., document ID)
+	Type      string `json:"type"`       // "text" or "pdf"
+	MediaType string `json:"media_type"` // MIME type like "text/plain"
+	Data      string `json:"data"`       // Document content
 }
 
 // DocumentCitations controls citation behavior for Anthropic
@@ -108,6 +107,7 @@ type ChatMessagePart struct {
 	CacheControl *CacheControl          `json:"cache_control,omitempty"`
 	Source       *DocumentSource        `json:"source,omitempty"`       // For document type
 	Title        string                 `json:"title,omitempty"`        // For document type
+	Context      string                 `json:"context,omitempty"`      // For document type - additional context about the document
 	Citations    *DocumentCitations     `json:"citations,omitempty"`    // For document type
 }
 
