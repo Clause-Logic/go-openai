@@ -90,9 +90,10 @@ const (
 
 // DocumentSource represents the source of a document for Anthropic citations
 type DocumentSource struct {
-	Type      string `json:"type"`       // "text" or "pdf"
-	MediaType string `json:"media_type"` // MIME type like "text/plain"
-	Data      string `json:"data"`       // Document content
+	Type      string `json:"type"`                // "text" or "pdf"
+	MediaType string `json:"media_type"`          // MIME type like "text/plain"
+	Data      string `json:"data"`                // Document content
+	Context   string `json:"context,omitempty"`   // Additional context about the document (e.g., document ID)
 }
 
 // DocumentCitations controls citation behavior for Anthropic
