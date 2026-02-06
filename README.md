@@ -10,6 +10,9 @@ This library provides unofficial Go clients for [OpenAI API](https://platform.op
 * DALL·E 2, DALL·E 3, GPT Image 1
 * Whisper
 
+## Fork
+This expands the types to cover [litellm](https://github.com/BerriAI/litellm) specific extensions to the openai format. Not all pieces are supported, we've been adding missing ones we needed as we go.
+
 ## Installation
 
 ```
