@@ -337,6 +337,14 @@ func (r *ChatCompletionResponseFormatJSONSchema) UnmarshalJSON(data []byte) erro
 	return nil
 }
 
+// AnthropicThinking configures extended thinking for Anthropic Claude models.
+// Passed through LiteLLM as a top-level request field.
+// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+type AnthropicThinking struct {
+	Type         string `json:"type"`          // "enabled" or "disabled"
+	BudgetTokens int    `json:"budget_tokens"` // max tokens for internal reasoning
+}
+
 // ChatCompletionRequestExtensions contains third-party OpenAI API extensions
 // (e.g., vendor-specific implementations like vLLM).
 type ChatCompletionRequestExtensions struct {
@@ -346,6 +354,8 @@ type ChatCompletionRequestExtensions struct {
 	// ensuring predictable and consistent outputs in scenarios where specific
 	// choices are required.
 	GuidedChoice []string `json:"guided_choice,omitempty"`
+	// Thinking enables Anthropic extended thinking for Claude models via LiteLLM.
+	Thinking *AnthropicThinking `json:"thinking,omitempty"`
 }
 
 // ChatCompletionRequest represents a request structure for chat completion API.
