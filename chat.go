@@ -346,6 +346,15 @@ type ChatCompletionRequestExtensions struct {
 	// ensuring predictable and consistent outputs in scenarios where specific
 	// choices are required.
 	GuidedChoice []string `json:"guided_choice,omitempty"`
+
+	// WebSearchOptions enables Anthropic's native web search. SearchContextSize
+	// controls how much search context is retrieved: "low", "medium", or "high".
+	WebSearchOptions *WebSearchOptions `json:"web_search_options,omitempty"`
+}
+
+// WebSearchOptions configures Anthropic's native web search capability.
+type WebSearchOptions struct {
+	SearchContextSize string `json:"search_context_size,omitempty"` // "low", "medium", "high"
 }
 
 // ChatCompletionRequest represents a request structure for chat completion API.
